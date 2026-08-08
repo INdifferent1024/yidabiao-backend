@@ -1,0 +1,7 @@
+name = "yidabiao-backend"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[[kv_namespaces]]
+binding = "YDB"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"

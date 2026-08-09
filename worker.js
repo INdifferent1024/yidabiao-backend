@@ -36,10 +36,14 @@ export default {
         res = await getMessages(request, env);
       } else if (route === '/api/doctors' && request.method === 'GET') {
         res = await getDoctors(env);
+      } else if (route === '/' || route === '') {
+        res = { body: '<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>鏄撹揪鏍囧悗绔湇鍔?/title></head><body style="font-family:sans-serif;text-align:center;padding:40px 16px;color:#333"><h1>鏄撹揪鏍?鍚庣鏈嶅姟</h1><p style="color:#666">鏈嶅姟杩愯涓紝璇峰湪銆屾槗杈炬爣銆岮pp 鍐呯櫥褰?娉ㄥ唽銆?/p><p style="color:#999;font-size:13px">鎺ュ彛鍓嶇紑锛?api/register 路 /api/login 路 /api/me 路 /api/consult 路 /api/messages 路 /api/doctors</p></body></html>', status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } };
       } else {
         res = json({ error: 'not found' }, 404);
       }
-      return new Response(JSON.stringify(res.body), { status: res.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const bodyStr = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+      const contentType = (res.headers && res.headers['Content-Type']) || 'application/json';
+      return new Response(bodyStr, { status: res.status, headers: { ...corsHeaders, 'Content-Type': contentType } });
     } catch (e) {
       return new Response(JSON.stringify({ error: 'server error: ' + e.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }

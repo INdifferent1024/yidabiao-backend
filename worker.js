@@ -1,9 +1,8 @@
 /**
- * 易达标 App 免费后端 (Cloudflare Workers)
- * 功能：账号注册/登录、用户资料(头像/姓名/年级)、在线问诊消息、校医沟通
- * 存储：Workers KV
+ * 鏄撹揪鏍?App 鍏嶈垂鍚庣 (Cloudflare Workers)
+ * 鍔熻兘锛氳处鍙锋敞鍐?鐧诲綍銆佺敤鎴疯祫鏂?澶村儚/濮撳悕/骞寸骇)銆佸湪绾块棶璇婃秷鎭€佹牎鍖绘矡閫? * 瀛樺偍锛歐orkers KV
  *
- * 部署：wrangler deploy
+ * 閮ㄧ讲锛歸rangler deploy
  */
 export default {
   async fetch(request, env, ctx) {
@@ -49,7 +48,7 @@ export default {
 
 function json(body, status = 200) { return { body, status }; }
 
-/** 密码哈希：PBKDF2-SHA256 + 随机盐 */
+/** 瀵嗙爜鍝堝笇锛歅BKDF2-SHA256 + 闅忔満鐩?*/
 async function hashPassword(password, salt) {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
@@ -65,7 +64,7 @@ function randHex(len) {
   return [...a].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** @returns user 对象或 null */
+/** @returns user 瀵硅薄鎴?null */
 async function findUser(env, username) {
   const key = 'user:' + String(username || '').toLowerCase().trim();
   const raw = await env.YDB.get(key);
@@ -85,15 +84,15 @@ async function getUserByToken(env, request) {
 
 async function register(request, env) {
   let body;
-  try { body = await request.json(); } catch (e) { return json({ error: '请求格式错误' }, 400); }
+  try { body = await request.json(); } catch (e) { return json({ error: '璇锋眰鏍煎紡閿欒' }, 400); }
   const username = String(body.username || '').trim();
   const password = String(body.password || '');
   const name = String(body.name || '').trim();
   const grade = String(body.grade || '').trim();
-  if (!username || !password) return json({ error: '用户名和密码不能为空' }, 400);
-  if (username.length < 2 || username.length > 20) return json({ error: '用户名长度需 2~20 个字符' }, 400);
-  if (password.length < 6) return json({ error: '密码至少 6 位' }, 400);
-  if (await findUser(env, username)) return json({ error: '该用户名已被注册' }, 409);
+  if (!username || !password) return json({ error: '鐢ㄦ埛鍚嶅拰瀵嗙爜涓嶈兘涓虹┖' }, 400);
+  if (username.length < 2 || username.length > 20) return json({ error: '鐢ㄦ埛鍚嶉暱搴﹂渶 2~20 涓瓧绗? }, 400);
+  if (password.length < 6) return json({ error: '瀵嗙爜鑷冲皯 6 浣? }, 400);
+  if (await findUser(env, username)) return json({ error: '璇ョ敤鎴峰悕宸茶娉ㄥ唽' }, 409);
 
   const salt = randHex(16);
   const pwdHash = await hashPassword(password, salt);
@@ -105,20 +104,20 @@ async function register(request, env) {
     avatar: '',
     createdAt: new Date().toISOString()
   };
-  const key = 'users:' + user.username;
-  await env.YDB.put(key, JSON.stringify({ ...user, salt, hash: pwdHash }), { expirationTtl: 0 });
+  const key = 'user:' + user.username;
+  await env.YDB.put(key, JSON.stringify({ ...user, salt, hash: pwdHash }));
   return json({ ok: true, user: publicUser(user) });
 }
 
 async function login(request, env) {
   let body;
-  try { body = await request.json(); } catch (e) { return json({ error: '请求格式错误' }, 400); }
+  try { body = await request.json(); } catch (e) { return json({ error: '璇锋眰鏍煎紡閿欒' }, 400); }
   const username = String(body.username || '').trim().toLowerCase();
   const password = String(body.password || '');
   const user = await findUser(env, username);
-  if (!user) return json({ error: '用户名或密码错误' }, 401);
+  if (!user) return json({ error: '鐢ㄦ埛鍚嶆垨瀵嗙爜閿欒' }, 401);
   const h = await hashPassword(password, user.salt);
-  if (h !== user.hash) return json({ error: '用户名或密码错误' }, 401);
+  if (h !== user.hash) return json({ error: '鐢ㄦ埛鍚嶆垨瀵嗙爜閿欒' }, 401);
 
   const token = randHex(32);
   await env.YDB.put('token:' + token, JSON.stringify({ username: user.username, expires: Date.now() + 7 * 24 * 3600 * 1000 }), { expirationTtl: 7 * 24 * 3600 });
@@ -127,38 +126,38 @@ async function login(request, env) {
 
 async function getMe(request, env) {
   const user = await getUserByToken(env, request);
-  if (!user) return json({ error: '未登录或登录已过期' }, 401);
+  if (!user) return json({ error: '鏈櫥褰曟垨鐧诲綍宸茶繃鏈? }, 401);
   return json({ ok: true, user: publicUser(user) });
 }
 
 async function updateMe(request, env) {
   const user = await getUserByToken(env, request);
-  if (!user) return json({ error: '未登录或登录已过期' }, 401);
+  if (!user) return json({ error: '鏈櫥褰曟垨鐧诲綍宸茶繃鏈? }, 401);
   let body;
-  try { body = await request.json(); } catch (e) { return json({ error: '请求格式错误' }, 400); }
+  try { body = await request.json(); } catch (e) { return json({ error: '璇锋眰鏍煎紡閿欒' }, 400); }
   if (body.name !== undefined) user.name = String(body.name).trim() || user.name;
   if (body.studentId !== undefined) user.studentId = String(body.studentId).trim();
   if (body.grade !== undefined) user.grade = String(body.grade).trim();
   if (body.avatar !== undefined) {
     const av = String(body.avatar || '');
-    // 头像仅允许 http(s) URL（避免非法数据；图片本身可存 KV 或外部图床）
-    if (av && !/^https?:\/\//.test(av)) return json({ error: '头像必须是 URL' }, 400);
+    // 澶村儚浠呭厑璁?http(s) URL锛堥伩鍏嶉潪娉曟暟鎹紱鍥剧墖鏈韩鍙瓨 KV 鎴栧閮ㄥ浘搴婏級
+    if (av && !/^https?:\/\//.test(av)) return json({ error: '澶村儚蹇呴』鏄?URL' }, 400);
     user.avatar = av;
   }
-  const raw = await env.YDB.get('users:' + user.username);
+  const raw = await env.YDB.get('user:' + user.username);
   const stored = JSON.parse(raw);
-  await env.YDB.put('users:' + user.username, JSON.stringify({ ...stored, name: user.name, studentId: user.studentId, grade: user.grade, avatar: user.avatar }));
+  await env.YDB.put('user:' + user.username, JSON.stringify({ ...stored, name: user.name, studentId: user.studentId, grade: user.grade, avatar: user.avatar }));
   return json({ ok: true, user: publicUser(user) });
 }
 
-/** 在线问诊：提交症状描述（进入校医可见的咨询列表） */
+/** 鍦ㄧ嚎闂瘖锛氭彁浜ょ棁鐘舵弿杩帮紙杩涘叆鏍″尰鍙鐨勫挩璇㈠垪琛級 */
 async function sendConsult(request, env) {
   const user = await getUserByToken(env, request);
-  if (!user) return json({ error: '未登录或登录已过期' }, 401);
+  if (!user) return json({ error: '鏈櫥褰曟垨鐧诲綍宸茶繃鏈? }, 401);
   let body;
-  try { body = await request.json(); } catch (e) { return json({ error: '请求格式错误' }, 400); }
+  try { body = await request.json(); } catch (e) { return json({ error: '璇锋眰鏍煎紡閿欒' }, 400); }
   const content = String(body.content || '').trim();
-  if (!content) return json({ error: '问诊内容不能为空' }, 400);
+  if (!content) return json({ error: '闂瘖鍐呭涓嶈兘涓虹┖' }, 400);
   const id = Date.now().toString(36) + randHex(4);
   const msg = {
     id,
@@ -175,30 +174,29 @@ async function sendConsult(request, env) {
   return json({ ok: true, msg });
 }
 
-/** 拉取问诊记录：自己的全部 + 校医对它的回复（简化：公开列表模式） */
+/** 鎷夊彇闂瘖璁板綍锛氳嚜宸辩殑鍏ㄩ儴 + 鏍″尰瀵瑰畠鐨勫洖澶嶏紙绠€鍖栵細鍏紑鍒楄〃妯″紡锛?*/
 async function getConsults(request, env) {
   const user = await getUserByToken(env, request);
-  if (!user) return json({ error: '未登录或登录已过期' }, 401);
-  const listRaw = await env.YDB.get('awaiting');
+  if (!user) return json({ error: '鏈櫥褰曟垨鐧诲綍宸茶繃鏈? }, 401);
+  const listRaw = await env.YDB.get('consults');
   const list = listRaw ? JSON.parse(listRaw) : [];
-  // 学生看自己的；校医(role=doctor)看全部（doctor 账号由管理后台预设，见 README）
-  let mine;
+  // 瀛︾敓鐪嬭嚜宸辩殑锛涙牎鍖?role=doctor)鐪嬪叏閮紙doctor 璐﹀彿鐢辩鐞嗗悗鍙伴璁撅紝瑙?README锛?  let mine;
   if (user.doctor) mine = list;
   else mine = list.filter(m => m.from === user.username);
   return json({ ok: true, consults: mine.slice(0, 50) });
 }
 
-/** 一对一聊天：发给指定校医或学生 */
+/** 涓€瀵逛竴鑱婂ぉ锛氬彂缁欐寚瀹氭牎鍖绘垨瀛︾敓 */
 async function sendMessage(request, env) {
   const user = await getUserByToken(env, request);
-  if (!user) return json({ error: '未登录或登录已过期' }, 401);
+  if (!user) return json({ error: '鏈櫥褰曟垨鐧诲綍宸茶繃鏈? }, 401);
   let body;
-  try { body = await request.json(); } catch (e) { return json({ error: '请求格式错误' }, 400); }
+  try { body = await request.json(); } catch (e) { return json({ error: '璇锋眰鏍煎紡閿欒' }, 400); }
   const to = String(body.to || '').trim().toLowerCase();
   const content = String(body.content || '').trim();
-  if (!to || !content) return json({ error: '缺少接收人或内容' }, 400);
+  if (!to || !content) return json({ error: '缂哄皯鎺ユ敹浜烘垨鍐呭' }, 400);
   const theOther = await findUser(env, to);
-  if (!theOther) return json({ error: '接收人不存在' }, 404);
+  if (!theOther) return json({ error: '鎺ユ敹浜轰笉瀛樺湪' }, 404);
   const pair = [user.username, to].sort().join('|');
   const msg = { id: Date.now().toString(36) + randHex(4), from: user.username, to, content, ts: new Date().toISOString() };
   const key = 'chat:' + pair;
@@ -211,7 +209,7 @@ async function sendMessage(request, env) {
 
 async function getMessages(request, env) {
   const user = await getUserByToken(env, request);
-  if (!user) return json({ error: '未登录或登录已过期' }, 401);
+  if (!user) return json({ error: '鏈櫥褰曟垨鐧诲綍宸茶繃鏈? }, 401);
   const withWho = new URL(request.url).searchParams.get('with') || request.headers.get('X-Chat-With');
   if (!withWho) return json({ ok: true, messages: [] });
   const pair = [user.username, String(withWho).toLowerCase()].sort().join('|');
